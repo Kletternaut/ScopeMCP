@@ -1,5 +1,6 @@
 import asyncio
 import json
+import math
 import time
 import logging
 import usb.core
@@ -135,10 +136,17 @@ class ScopeController:
                 json_str = header_raw[header_raw.find(b'{'):header_raw.rfind(b'}')+1].decode('ascii', errors='ignore')
                 self._meta_cache = json.loads(json_str)
                 self._meta_cache_time = now
+                # DEBUG: Loggt alle Keys des ersten CHANNEL-Eintrags einmalig.
+                # Benoetigt um den korrekten Key-Namen fuer GridOffset zu ermitteln
+                # (vermutet: 'GRID_OFF', muss gegen echte Firmware verifiziert werden).
+                ch_list = self._meta_cache.get("CHANNEL", [])
+                if ch_list:
+                    logger.info(f"[DEBUG] CHANNEL[0] keys: {list(ch_list[0].keys())}")
+                    logger.info(f"[DEBUG] CHANNEL[0] full: {ch_list[0]}")
                 return self._meta_cache
         except Exception as e:
             logger.error(f"Metadata fetch failed: {e}")
-        
+
         return {}
 
 scope = ScopeController()
@@ -220,8 +228,9 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
         logger.error("Parsing error: parse_raw_samples returned None")
         return {"error": "Data corruption during parsing"}
 
-    total = len(samples_np)
-    step = max(1, total // max_samples)
+        total = len(samples_np)
+    # ceil statt floor garantiert downsampled_count <= max_samples
+    step = max(1, math.ceil(total / max_samples))
     final_samples = samples_np[::step].tolist()
 
     ch_list = meta.get("CHANNEL", [{}, {}])
@@ -260,7 +269,8 @@ async def capture_dual_waveform(max_samples: int = 400) -> dict:
         if data and len(data) > 100:
             samples_np = parse_raw_samples(data)
             if samples_np is not None:
-                step = max(1, len(samples_np) // max_samples)
+                # ceil statt floor garantiert downsampled_count <= max_samples
+                step = max(1, math.ceil(len(samples_np) / max_samples))
                 results[f"CH{ch}"] = {
                     "samples": samples_np[::step].tolist(),
                     "metadata": meta.get("CHANNEL", [{}, {}])[ch - 1]
@@ -343,7 +353,14 @@ async def set_run_state(state: str) -> str:
 
 @mcp.tool()
 async def get_measurements() -> dict:
-    """Liefert berechnete Messwerte beider Kanäle (Freq, Vpp, RMS, Period)."""
+    """Liefert Messwerte beider Kanaele aus dem Metadaten-Cache (Freq, Period, Scale, Probe).
+
+    Hinweis: Vpp und RMS sind im Metadaten-Cache der Firmware nicht enthalten.
+    Fuer diese Werte sind separate ':MEASure:PKPK?' / ':MEASure:Vrms?'-Queries
+    noetig (noch nicht implementiert).
+    Das Feld 'raw_channel_keys' zeigt alle verfuegbaren JSON-Keys des Geraets
+    und hilft bei der Diagnose unbekannter Felder (z.B. GridOffset-Key).
+    """
     dev = await asyncio.to_thread(scope.get_device)
     if not dev: return {"error": "No Device"}
     
@@ -361,7 +378,7 @@ async def get_measurements() -> dict:
     for i, ch in enumerate(channels):
         name = ch.get("NAME", f"CH{i+1}")
         freq = ch.get("FREQUENCE", 0)
-        
+
         result["channels"][name] = {
             "frequency_hz": freq,
             "period_ms": round(1000 / freq, 4) if freq and freq > 0 else None,
@@ -369,8 +386,10 @@ async def get_measurements() -> dict:
             "probe": ch.get("PROBE"),
             "coupling": ch.get("COUPLING"),
             "display": ch.get("DISPLAY"),
+            # Alle rohen Keys fuer GridOffset-Diagnose und zukuenftige Erweiterungen
+            "raw_channel_keys": list(ch.keys()),
         }
-        
+
     return result
 
 
