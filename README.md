@@ -80,8 +80,9 @@ Add the following to your `%APPDATA%\Claude\claude_desktop_config.json`:
 
 - **Interface**: USB Bulk (EP 0x01 OUT, 0x81 IN)
 - **Terminator**: `\n` (Line Feed)
-- **Data Format**: 16-bit Big-Endian Signed Integers.
+- **Data Format**: 16-bit **Little-Endian** Signed Integers.
 - **Header**: JSON-based metadata for scope parameters.
+- **Stability**: Required 1.5s delay after `:SCALe` commands for mechanical relay switching.
 
 ## License
 MIT
