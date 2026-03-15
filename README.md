@@ -1,4 +1,4 @@
-# [DS1102 Scope MCP Server (Abestop/Owon SDS1102 V3.1.0)](resources/images/Abestop_DS1102.jpg)
+# DS1102 Scope MCP Server ([Abestop/Owon SDS1102](resources/images/Abestop_DS1102.jpg) V3.1.0)
 
 <p align="center">
   <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="200">
