@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="400">
+  <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="200">
 </p>
 
 # DS1102 Scope MCP Server (Abestop/Owon V3.1.0)
