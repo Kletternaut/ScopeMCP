@@ -18,12 +18,13 @@ class ScopeController:
     def __init__(self):
         self._dev = None
         self._last_cmd_time = 0
+        self._meta_cache = None          # FIX 1: Metadaten-Cache
+        self._meta_cache_time = 0        # FIX 1: Zeitstempel des Caches
 
     def get_device(self):
         """Findet das USB-Gerät und initialisiert es einmalig oder bei Verlust."""
         if self._dev:
             try:
-                # Teste ob Gerät noch da ist
                 self._dev.idVendor
                 return self._dev
             except:
@@ -33,7 +34,6 @@ class ScopeController:
         dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
         if dev:
             try:
-                # Unter Windows oft nötig für libusb-win32 Stabilität
                 dev.set_configuration()
                 usb.util.claim_interface(dev, 0)
             except:
@@ -42,160 +42,241 @@ class ScopeController:
         return self._dev
 
     def _clear_buffer(self, dev):
-        """Leert den USB-Eingangspuffer gründlich."""
-        try:
-            while True:
-                dev.read(EP_IN, 1024, timeout=10)
-        except:
-            pass
+        """Leert den USB-Eingangspuffer. FIX 2: Nur noch 3 Versuche statt endlos."""
+        for _ in range(3):  # FIX 2: War 'while True' - blockierte bei vollem Puffer!
+            try:
+                dev.read(EP_IN, 4096, timeout=5)  # FIX 2: 4KB statt 1KB, 5ms statt 10ms
+            except:
+                break  # Puffer leer, fertig
 
     def send_cmd(self, dev, cmd):
-        """Sende Befehl mit erzwungenen Pausen für Hardware-Stabilität."""
+        """Sende Befehl im Owon-Binär-Format (4 Bytes Länge + Befehl + \\n)."""
+        if not cmd.startswith(":"):
+            cmd = ":" + cmd
         if not cmd.endswith("\n"):
             cmd += "\n"
-        
-        # Erzwinge Pause zwischen Befehlen (Rate Limiting)
+
+        cmd_bytes = cmd.encode('ascii')
+        length_header = len(cmd_bytes).to_bytes(4, byteorder='little')
+        packet = length_header + cmd_bytes
+
+        # FIX 3: Throttle von 300ms auf 50ms reduziert
         now = time.time()
         elapsed = now - self._last_cmd_time
-        if elapsed < 0.5:
-            time.sleep(0.5 - elapsed)
+        if elapsed < 0.05:  # FIX 3: War 0.3 (300ms!) → jetzt 50ms
+            time.sleep(0.05 - elapsed)
 
         self._clear_buffer(dev)
-        dev.write(EP_OUT, cmd.encode('ascii'))
+        dev.write(EP_OUT, packet)
         self._last_cmd_time = time.time()
-        
-        # Relais oder komplexe Operationen brauchen Zeit
-        if any(kw in cmd.upper() for kw in ["SCAL", "HOR", "TRIG", "AUT"]):
-            time.sleep(1.5)
-        else:
-            time.sleep(0.1)
 
-    def read_resp(self, dev, size=16384, timeout=2000):
-        """Liest Antwort vom Gerät."""
+        # Delays je nach Kommandotyp
+        if any(kw in cmd.upper() for kw in ["AUT"]):
+            time.sleep(1.0)   # Autoset braucht wirklich Zeit
+        elif any(kw in cmd.upper() for kw in ["SCAL", "HOR", "TRIG", "OFFS"]):
+            time.sleep(0.1)   # Relais-Schaltzeit
+        else:
+            time.sleep(0.001) # Abfragen fast sofort
+
+    def read_resp(self, dev, size=32768, timeout=800):
+        """Liest Antwort vom Gerät mit optimiertem USB-Bulk-Transfer."""
         try:
             data = dev.read(EP_IN, size, timeout=timeout)
             if not data: return None
             return bytes(data)
-        except Exception:
+        except:
             return None
+
+    def get_metadata_cached(self, dev, max_age=2.0):
+        """FIX 1: Metadaten mit Cache (max_age Sekunden), spart 1-2 USB-Roundtrips."""
+        now = time.time()
+        if self._meta_cache and (now - self._meta_cache_time) < max_age:
+            return self._meta_cache  # Cache-Hit, kein USB-Transfer!
+
+        self.send_cmd(dev, ":DATA:WAVE:SCREEN:HEAD?")
+        header_raw = self.read_resp(dev, size=8192, timeout=500)
+        if header_raw and b'{' in header_raw:
+            try:
+                json_str = header_raw[header_raw.find(b'{'):header_raw.rfind(b'}')+1].decode('ascii', errors='ignore')
+                self._meta_cache = json.loads(json_str)
+                self._meta_cache_time = now
+                return self._meta_cache
+            except:
+                pass
+        return {}
 
 scope = ScopeController()
 
+
 @mcp.tool()
 async def get_live_metadata() -> dict:
-    """Ruft den vollständigen JSON-Metadaten-Header ab (Frequenz, Vpp, Timebase, etc.)."""
+    """Holt JSON-Metadaten (Frequenz, Vpp, Timebase, etc.)."""
     dev = scope.get_device()
-    if not dev: return {"error": "Oszi nicht gefunden oder nicht eingeschaltet."}
-    
-    scope.send_cmd(dev, ":DATA:WAVE:SCREEN:HEAD?")
-    time.sleep(0.8)
-    header_raw = scope.read_resp(dev, size=8192, timeout=2500)
-    
-    if header_raw and b'{' in header_raw:
-        try:
-            start = header_raw.find(b'{')
-            end = header_raw.rfind(b'}') + 1
-            json_str = header_raw[start:end].decode('ascii', errors='ignore')
-            return json.loads(json_str)
-        except Exception as e:
-            return {"error": f"JSON parse error: {str(e)}", "raw_len": len(header_raw)}
-    
-    return {"error": "Keine Metadaten-Antwort erhalten (Timeout)."}
+    if not dev: return {"error": "Device not found"}
+    # FIX 1: Cache mit force-refresh (max_age=0 → immer neu laden bei explizitem Aufruf)
+    scope._meta_cache = None
+    return scope.get_metadata_cached(dev)
+
 
 @mcp.tool()
 async def set_horizontal_scale(scale: str) -> str:
-    """Setzt die Zeitbasis (Horizontal-Skalierung). Beispiele: '1ms', '500us', '100ns'."""
+    """Zeitbasis setzen (z.B. '1ms', '500us')."""
     dev = scope.get_device()
-    if not dev: return "Fehler: Gerät nicht gefunden."
+    if not dev: return "No Device"
+    scope._meta_cache = None  # FIX 1: Cache invalidieren nach Änderung
     scope.send_cmd(dev, f":HORizontal:SCALe {scale}")
-    return f"Horizontal-Skalierung auf {scale} gesetzt."
+    return f"Horizontal Scale: {scale}"
+
 
 @mcp.tool()
 async def set_vertical_scale(channel: int, scale: str) -> str:
-    """Setzt die vertikale Skalierung für einen Kanal. Beispiele: '1.00V', '500mV', '2V'."""
+    """Volt/Div setzen (z.B. '1V', '500mV')."""
     dev = scope.get_device()
-    if not dev: return "Fehler: Gerät nicht gefunden."
+    if not dev: return "No Device"
+    scope._meta_cache = None  # FIX 1: Cache invalidieren nach Änderung
     scope.send_cmd(dev, f":CH{channel}:SCALe {scale}")
-    return f"Kanal {channel} Skalierung auf {scale} gesetzt."
+    return f"Channel {channel} Scale: {scale}"
+
 
 @mcp.tool()
-async def capture_waveform(channel: int) -> dict:
-    """Erfasst die aktuellen Wellenform-Daten und dekodiert sie (LE 16-bit) mit PK-PK Kalibrierung (Faktor 384.6)."""
+async def set_channel_coupling(channel: int, coupling: str) -> str:
+    """Kopplung setzen ('AC', 'DC', 'GND')."""
     dev = scope.get_device()
-    if not dev: return {"error": "Device not found"}
-    
-    # 1. Metadaten für Skalierung und Tastkopf (PROBE) holen
-    scope.send_cmd(dev, ":DATA:WAVE:SCREEN:HEAD?")
-    header_raw = scope.read_resp(dev)
-    scale_y = 1.0
-    probe_factor = 1.0
-    if header_raw and b'{' in header_raw:
-        try:
-            js = json.loads(header_raw[header_raw.find(b'{'):header_raw.rfind(b'}')+1].decode('ascii'))
-            ch_data = js["CHANNEL"][channel-1]
-            scale_str = ch_data["SCALE"]
-            scale_y = float(scale_str.replace("mV", "")) / 1000.0 if "mV" in scale_str else float(scale_str.replace("V", ""))
-            
-            # Tastkopf-Dämpfung berücksichtigen (z.B. "10X" -> Faktor 10)
-            probe_str = ch_data.get("PROBE", "1X")
-            if "X" in probe_str:
-                probe_factor = float(probe_str.replace("X", ""))
-        except: pass
+    if not dev: return "No Device"
+    scope._meta_cache = None  # FIX 1: Cache invalidieren nach Änderung
+    scope.send_cmd(dev, f":CH{channel}:COUPling {coupling.upper()}")
+    return f"Channel {channel} Coupling: {coupling.upper()}"
 
-    # 2. WAVEFORM anfordern
+
+@mcp.tool()
+async def set_voltage_offset(channel: int, offset: float) -> str:
+    """Offset setzen in Volt (z.B. 0.0, -1.5)."""
+    dev = scope.get_device()
+    if not dev: return "No Device"
+    scope._meta_cache = None  # FIX 1: Cache invalidieren nach Änderung
+    scope.send_cmd(dev, f":CH{channel}:OFFSet {offset:.3f}")
+    return f"Channel {channel} Offset: {offset:.3f}V"
+
+
+@mcp.tool()
+async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
+    """Erfasst Wellenform mit optimierten Wartezeiten."""
+    dev = scope.get_device()
+    if not dev: return {"error": "No Device"}
+
+    # FIX 1: Metadaten aus Cache holen (kein extra USB-Roundtrip wenn frisch)
+    meta = scope.get_metadata_cached(dev)
+
+    # FIX 4: Keine extra time.sleep(0.1) nach send_cmd - timeout in read_resp reicht
     scope.send_cmd(dev, f":DATA:WAVE:SCREEN:CH{channel}?")
-    time.sleep(0.5)
-    
-    data = scope.read_resp(dev, size=16384, timeout=3000)
-    
-    if not data or len(data) < 100:
-        return {"error": "Keine Wellenform-Daten empfangen."}
+    data = scope.read_resp(dev, size=16384, timeout=2000)  # FIX 4: War 1500ms
+    if not data or len(data) < 10: return {"error": "No wave data"}
 
-    # Header-Analyse (Längenfeld 4 Bytes, Little-Endian)
-    msg_len = int.from_bytes(data[:4], byteorder='little')
-    payload = data[4:4+msg_len]
+    raw_samples = []
+    for i in range(4, len(data) - 1, 2):
+        val = int.from_bytes(data[i:i+2], byteorder='little', signed=True)
+        raw_samples.append(val)
 
-    # RECHTECK-KALIBRIERUNG (BEIDE KANÄLE):
-    # Nach Reset: 8.39V Vpp bei 1.00V/div und PROBE 10X.
-    # Faktor: 250 LSB pro Division ist der Standard für dieses Modell.
-    samples = []
-    for i in range(0, len(payload), 2):
-        if i + 1 >= len(payload): break
-        val = int.from_bytes(payload[i:i+2], byteorder='little', signed=True)
-        # Teiler 250.0 LSB pro Division
-        voltage = (val / 250.0) * scale_y
-        samples.append(round(voltage, 4)) 
+    total = len(raw_samples)
+    step = max(1, total // max_samples)
+    final_samples = raw_samples[::step]
 
-    if not samples:
-        return {"error": "Dekodierung fehlgeschlagen, keine Samples gefunden."}
-
-    vpp_calc = round(max(samples) - min(samples), 3)
+    ch_info = meta.get("CHANNEL", [{}, {}])[channel - 1]
     return {
         "channel": channel,
-        "sample_count": len(samples),
-        "vpp_v_calculated": vpp_calc,
-        "note": f"Erfassung CH{channel} erfolgreich. Faktor 250 LSB/Div.",
-        "preview_volt": samples[:10],
-        "y_scale": scale_y,
-        "unit": "Volt"
+        "raw_samples": final_samples,
+        "original_count": total,
+        "downsampled_count": len(final_samples),
+        "metadata": {
+            "scale_v_per_div_raw": ch_info.get("SCALE", "1V"),
+            "probe_factor": ch_info.get("PROBE", "1X"),
+            "grid_offset": ch_info.get("OFFSET", 0),
+            "lsb_per_div": 250.0
+        },
+        "instruction": "voltage = (raw - offset) / 250 * scale * probe"
     }
 
+
 @mcp.tool()
-async def set_running_state(state: str) -> str:
-    """Setzt das Oszilloskop auf 'RUN' oder 'STOP'."""
+async def capture_dual_waveform(max_samples: int = 400) -> dict:
+    """Erfasst BEIDE Kanäle gleichzeitig. Optimiert für maximalen USB-Durchsatz."""
     dev = scope.get_device()
-    if not dev: return "Fehler: Gerät nicht gefunden."
-    cmd = "stop" if state.upper() == "STOP" else "run"
-    scope.send_cmd(dev, f":{cmd}")
-    return f"Scope-Status auf {state} gesetzt."
+    if not dev: return {"error": "No Device"}
+
+    # FIX 1: Metadaten aus Cache - bei Dual-Capture besonders wertvoll
+    meta = scope.get_metadata_cached(dev)
+
+    results = {}
+    for ch in [1, 2]:
+        scope.send_cmd(dev, f":DATA:WAVE:SCREEN:CH{ch}?")
+        # FIX 4: Kein time.sleep() hier - read_resp wartet mit Timeout
+        data = scope.read_resp(dev, size=8192, timeout=2000)  # FIX 4: War 1500ms
+
+        if data and len(data) > 100:
+            raw = []
+            for i in range(4, len(data) - 1, 2):
+                if i + 1 >= len(data): break
+                raw.append(int.from_bytes(data[i:i+2], byteorder='little', signed=True))
+
+            step = max(1, len(raw) // max_samples)
+            results[f"CH{ch}"] = {
+                "samples": raw[::step],
+                "meta": meta.get("CHANNEL", [{}, {}])[ch - 1]
+            }
+
+    return {
+        "channels": results,
+        "lsb_per_div": 250.0,
+        "instruction": "voltage = (raw - offset) / 250 * scale * probe"
+    }
+
+
+@mcp.tool()
+async def set_trigger_mode(mode: str) -> str:
+    """Modus setzen ('AUTO', 'NORMAL', 'SINGLE')."""
+    dev = scope.get_device()
+    if not dev: return "No Device"
+    scope.send_cmd(dev, f":TRIGger:SWEep {mode.upper()}")
+    return f"Trigger Mode: {mode.upper()}"
+
+
+@mcp.tool()
+async def set_trigger_slope(slope: str) -> str:
+    """Flanke setzen ('RISE' oder 'FALL')."""
+    dev = scope.get_device()
+    if not dev: return "No Device"
+    scope.send_cmd(dev, f":TRIGger:EDGE:SLOpe {slope.upper()}")
+    return f"Trigger Slope: {slope.upper()}"
+
+
+@mcp.tool()
+async def set_trigger_source(source: str) -> str:
+    """Quelle setzen ('CH1' oder 'CH2')."""
+    dev = scope.get_device()
+    if not dev: return "No Device"
+    scope.send_cmd(dev, f":TRIGger:EDGE:SOURce {source.upper()}")
+    return f"Trigger Source: {source.upper()}"
+
 
 @mcp.tool()
 async def run_autoset() -> str:
-    """Führt ein Autoset am Oszilloskop durch."""
+    """Führt Autoset aus."""
     dev = scope.get_device()
-    if not dev: return "Fehler: Gerät nicht gefunden."
+    if not dev: return "No Device"
+    scope._meta_cache = None  # FIX 1: Cache invalidieren nach Autoset
     scope.send_cmd(dev, ":AUToset on")
-    return "Autoset ausgeführt."
+    return "Autoset initiated."
+
+
+@mcp.tool()
+async def set_run_state(state: str) -> str:
+    """'RUN' oder 'STOP'."""
+    dev = scope.get_device()
+    if not dev: return "No Device"
+    cmd = "run" if "RUN" in state.upper() else "stop"
+    scope.send_cmd(dev, f":{cmd}")
+    return f"Scope is now {cmd.upper()}"
+
 
 if __name__ == "__main__":
     mcp.run()
