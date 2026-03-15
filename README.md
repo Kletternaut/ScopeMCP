@@ -6,7 +6,39 @@
 
 A Python MCP server that connects the [**Owon/Abestop DS1102 (Firmware V3.1.0)**](resources/images/Abestop_DS1102.jpg) oscilloscope (Firmware V3.1.0) to AI assistants like Claude via the [Model Context Protocol](https://modelcontextprotocol.io/).
 
+---
 
+## Available Tools
+
+### Status & Metadata
+- `get_connection_status`: Checks connection, model, run status, and timestamp.
+- `get_live_metadata`: Returns full device metadata (timebase, sample rate, channel/trigger config).
+- `get_measurements`: Provides frequency, period, scale, probe factor, and coupling for both channels.
+
+### Waveform Capture
+- `capture_waveform(channel, max_samples)`: Captures a single channel (fixed at 1520 hardware samples, software downsampled).
+- `capture_dual_waveform(max_samples)`: Efficiently captures both channels in a single operation.
+
+**Voltage conversion formula**:
+```
+voltage = (raw - OFFSET) / 250.0 * scale_v * probe_factor
+```
+
+**Note:** The DS1102 always transfers 1520 samples over USB. Downsampling occurs in software.
+
+### Vertical & Horizontal Control
+- `set_vertical_scale(channel, scale)`: e.g., "1V", "500mV".
+- `set_channel_coupling(channel, coupling)`: AC, DC, or GND.
+- `set_voltage_offset(channel, offset)`: Vertical position in Volts.
+- `set_horizontal_scale(scale)`: e.g., "1ms", "500us".
+
+### Trigger & Device Control
+- `set_trigger_mode(mode)`: AUTO, NORMAL, SINGLE.
+- `set_trigger_source(source)`: CH1, CH2.
+- `set_trigger_slope(slope)`: RISE, FALL.
+- `set_trigger_level(level_mv)`: Threshold in millivolts (e.g., 500.0 for 0.5V).
+- `set_run_state(state)`: RUN or STOP.
+- `run_autoset()`: Performs automatic oscilloscope setup.
 
 ---
 
@@ -36,40 +68,6 @@ Add to `claude_desktop_config.json`:
   }
 }
 ```
-
----
-
-## Available Tools
-
-### Status & Metadata
-- `get_connection_status`: Checks connection, model, run status, and timestamp.
-- `get_live_metadata`: Returns full device metadata (timebase, sample rate, channel/trigger config).
-- `get_measurements`: Provides frequency, period, scale, probe factor, and coupling for both channels.
-
-### Waveform Capture
-- `capture_waveform(channel, max_samples)`: Captures a single channel (fixed at 1520 hardware samples, software downsampled).
-- `capture_dual_waveform(max_samples)`: Efficiently captures both channels in a single operation.
-
-**Voltage conversion formula**:
-```
-voltage = (raw - OFFSET) / 250.0 * scale_v * probe_factor
-```
-
-> **Note:** The DS1102 always transfers 1520 samples over USB. Downsampling occurs in software.
-
-### Vertical & Horizontal Control
-- `set_vertical_scale(channel, scale)`: e.g., "1V", "500mV".
-- `set_channel_coupling(channel, coupling)`: AC, DC, or GND.
-- `set_voltage_offset(channel, offset)`: Vertical position in Volts.
-- `set_horizontal_scale(scale)`: e.g., "1ms", "500us".
-
-### Trigger & Device Control
-- `set_trigger_mode(mode)`: AUTO, NORMAL, SINGLE.
-- `set_trigger_source(source)`: CH1, CH2.
-- `set_trigger_slope(slope)`: RISE, FALL.
-- `set_trigger_level(level_mv)`: Threshold in millivolts (e.g., 500.0 for 0.5V).
-- `set_run_state(state)`: RUN or STOP.
-- `run_autoset()`: Performs automatic oscilloscope setup.
 
 ---
 
