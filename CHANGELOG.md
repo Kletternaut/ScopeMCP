@@ -2,43 +2,43 @@
 
 ## [V1.2.0] - 2026-03-15
 
-### Hinzugefügt
-- **Messwert-Tool**: `get_measurements` für Freq, Vpp, RMS direkt aus Hardware-Metadaten.
-- **Trigger-Level**: `set_trigger_level` Tool für präzise mV-Steuerung.
-- **Verbindungs-Status**: `get_connection_status` für Health-Checks.
-- **Zeitstempel**: ISO-Zeitstempel in allen Capture-Ergebnissen.
-- **Validierung**: Strenge Parameter-Prüfung für Kanäle, Trigger-Modi und Slopes.
+### Added
+- **Measurement Tool**: New `get_measurements` tool for direct hardware extraction of Freq, Vpp, and RMS.
+- **Trigger Level**: New `set_trigger_level` tool for high-precision mV settings.
+- **Connection Status**: Added `get_connection_status` for quick hardware health checks.
+- **Timestamping**: Integrated ISO timestamps in all capture result structures.
+- **Validation**: Strict parameter checking for channels, trigger modes, and slopes.
 
-### Performance & Robustheit
-- **Async I/O**: Vollständige Umstellung auf `asyncio.to_thread()` für alle USB-Hardware-Aufrufe.
-- **Schnelles Parsing**: Umstellung auf `struct.unpack` für Waveform-Daten.
-- **Metadaten-Cache**: 2.0s TTL Cache zur Reduzierung von USB-Latenzen.
-- **USB-Recovery**: Automatischer Re-Initialisierungs-Mechanismus bei Verbindungsverlust.
-- **Logging**: Integration des Python `logging` Moduls für strukturierte Fehlersuche.
-- **Optimiertes Buffer-Clearing**: Reduzierte Puffer-Leerzyklen für schnellere Tool-Antworten.
+### Performance & Robustness
+- **Async I/O**: Fully migrated to `asyncio.to_thread()` for all hardware USB operations.
+- **Fast Parsing**: Refactored waveform data extraction using `struct.unpack`.
+- **Metadata Cache**: Implemented a smart 2.0s TTL cache to reduce USB latency.
+- **USB Recovery**: Added automatic re-initialization logic to recover from device disconnects.
+- **Logging**: Integrated Python's `logging` module for structured error tracking.
+- **Buffer Optimization**: Improved buffer clearing cycles for reduced tool response times.
 
-## [1.1.0] - Aktuell
+## [1.1.0] - Previous
 
-### Hinzugefügt
-- **Dual-Channel Capture:** Neuer optimierter Befehl `capture_dual_waveform`, der beide Kanäle in einer Operation erfasst (reduziert Wartezeit von 16s auf ~9s).
-- **Downsampling:** Unterstützung für einstellbares Downsampling (`downsample_factor`) zur schnelleren Übertragung im Chat.
-- **Detaillierte Fernsteuerung:** Erweiterung der Tools um Kopplung (AC/DC), Offset-Verschiebung, Trigger-Source und Trigger-Level.
-- **Vertical Orientation Fix:** Invertierung der Formel (`(Offset - Raw)`) zur korrekten Darstellung von CH1 (oben) und CH2 (unten) entsprechend der Hardware-Anzeige.
+### Added
+- **Dual-Channel Capture:** Optimized `capture_dual_waveform` reducing acquisition time from 16s to ~7-9s.
+- **Downsampling:** Support for adjustable `downsample_factor` to speed up chat-side rendering.
+- **Remote Control Suite:** Added tools for Coupling (AC/DC), Offset adjustment, and Trigger source.
+- **Vertical Orientation Fix:** Reversed scaling formula (`(Offset - Raw)`) to match hardware display (CH1 top, CH2 bottom).
 
-### Geändert
-- **Performance-Tuning:** Reduzierung der Delays für nicht-mechanische Befehle auf 100ms.
-- **USB-Buffer:** Erhöhung des USB-Lesepuffers auf 32.768 Bytes für stabilere Datentransfers bei hohen Sampleraten.
-- **Fehlerbehandlung:** Robusteres Parsing der Meta-Daten (`ch_info` Fix) und verbesserte Timeout-Logik (800ms).
+### Changed
+- **Performance Tuning:** Reduced non-mechanical command delays to 50-100ms.
+- **USB Buffering:** Increased read buffer to 32KB for stable high-sample-rate transfers.
+- **Error Handling:** Robust metadata parsing (`ch_info` fix) and improved timeout logic (800ms).
 
-## [1.0.0] - Vorherige Version
+## [1.0.0] - Initial Release
 
-### Hinzugefügt
-- **MCP-Server (`ds1102_mcp.py`):** FastMCP-Integration zur Oszilloskop-Steuerung über Claude Desktop.
-- **Waveform-Capturing:** Automatische Erfassung von CH1 und CH2 Rohdaten.
-- **Metadaten-Analyse:** Unterstützung der JSON-Metadaten für automatische Skalierung.
-- **USB-Stabilitätslogik:** 1.5s Pausen nach Relais-Schaltvorgängen (`:SCALe`).
+### Added
+- **MCP Server (`ds1102_mcp.py`):** Full FastMCP integration for Claude Desktop.
+- **Waveform Capturing:** Automatic binary capture for CH1 and CH2.
+- **Metadata Analysis:** JSON-based extraction of scale, probe, and timebase settings.
+- **Relay Safety:** Automatic 1.5s delay after mechanical relay switching (`:SCALe`).
 
-### Geändert
-- **Waveform-Parsing:** Umstellung von Big-Endian auf **16-bit signed Little-Endian**. Behebt "Sinus-Matsch".
-- **Kalibrierung:** Einführung des Faktors **250.0 LSB/Division** für SCREEN-Daten.
+### Changed
+- **Waveform Parsing:** Migrated from Big-Endian to **16-bit signed Little-Endian** (fixes "sinus-mats" issues).
+- **Calibration:** Established **250.0 LSB/Division** scaling factor for SCREEN-mode data.
 
