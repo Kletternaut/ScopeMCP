@@ -20,6 +20,17 @@ def get_device():
     backend = usb.backend.libusb1.get_backend(find_library=libusb_package.find_library)
     dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
     if dev:
+        # Auf Linux muss der Kernel-Treiber oft gelöst werden, damit PyUSB zugreifen kann
+        try:
+            if dev.is_kernel_driver_active(0):
+                dev.detach_kernel_driver(0)
+                print("ℹ️ Kernel-Treiber gelöst (Linux).")
+        except NotImplementedError:
+            # Unter Windows wird diese Methode nicht unterstützt (kein Fehler)
+            pass
+        except Exception as e:
+            print(f"⚠️ Warnung beim Lösen des Kernel-Treibers: {e}")
+
         dev.set_configuration()
     return dev
 

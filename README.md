@@ -15,8 +15,13 @@ Unlike traditional PC software, **ScopeMCP** allows AI agents (such as Claude De
 ## Prerequisites
 
 - **Python 3.10+**
-- **LibUSB Drivers**: On Windows, you must install the `libusb-win32` or `WinUSB` driver for the device using [Zadig](https://zadig.akeo.ie/).
-- **Original Software**: Ensure the original DSO-Wave software is closed to release the USB handle.
+- **USB Permissions (Linux/Raspberry Pi)**: On Linux, you must grant permissions to the USB device. Create a udev rule:
+  ```bash
+  echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="5345", ATTR{idProduct}=="1234", MODE="0666"' | sudo tee /etc/udev/rules.d/99-ds1102.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+- **LibUSB Drivers (Windows)**: On Windows, use [Zadig](https://zadig.akeo.ie/) to install the `libusb-win32` or `WinUSB` driver.
+- **Original Software**: Ensure any original DSO software is closed.
 
 ## Installation
 
