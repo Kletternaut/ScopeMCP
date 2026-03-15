@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# Analysis & Logs
+analysis/
+*.txt
+*.csv
+*.pcapng
+.copilot/
+
+# VS Code
+.vscode/
