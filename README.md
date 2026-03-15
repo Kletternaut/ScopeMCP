@@ -45,14 +45,15 @@
 
 ## Available MCP Tools
 
-1. `capture_dual_waveform`: Optimized dual-channel acquisition.
-2. `capture_waveform`: Single channel acquisition.
-3. `set_autoset`: Automatic setup.
-4. `set_vscale` / `set_hscale`: Scale adjustments.
-5. `set_coupling`: AC/DC switching.
-6. `set_offset`: Vertical position.
-7. `set_trigger_mode` / `set_trigger_level`.
-8. `get_idn`: Device identification.
+1. `capture_dual_waveform`: Optimized dual-channel acquisition (saves ~50% time).
+2. `capture_waveform`: Single channel acquisition with downsampling.
+3. `get_live_metadata`: Full JSON metadata (Freq, Vpp, Settings).
+4. `run_autoset`: Automatic setup of all parameters.
+5. `set_vertical_scale` / `set_horizontal_scale`: Scale adjustments.
+6. `set_channel_coupling`: AC/DC/GND switching.
+7. `set_voltage_offset`: Vertical position adjustment (in Volts).
+8. `set_trigger_mode` / `set_trigger_slope` / `set_trigger_source`: Trigger configuration.
+9. `set_run_state`: Toggle between RUN and STOP.
 
 ## License
 MIT
