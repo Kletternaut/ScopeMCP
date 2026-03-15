@@ -8,6 +8,7 @@ import usb.util
 import usb.backend.libusb1
 import libusb_package
 from mcp.server.fastmcp import FastMCP
+from ds1102_logic import parse_raw_samples, parse_scale_to_volts, VOLTAGE_FORMULA, LSB_PER_DIV
 
 # Logging-Konfiguration
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +19,7 @@ VID, PID = 0x5345, 0x1234
 EP_OUT, EP_IN = 0x01, 0x81
 USB_READ_SIZE_LARGE = 32768
 USB_READ_SIZE_SMALL = 8192
-LSB_PER_DIV = 250.0
+# LSB_PER_DIV wird direkt aus ds1102_logic importiert
 META_CACHE_TTL = 2.0  # Sekunden
 CMD_THROTTLE_S = 0.05
 
@@ -199,32 +200,33 @@ async def set_voltage_offset(channel: int, offset: float) -> str:
 @mcp.tool()
 async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
     """Erfasst Wellenform eines Kanals."""
-    if channel not in (1, 2): return {"error": f"Invalid channel: {channel}"}
-    
+    if channel not in (1, 2):
+        return {"error": f"Invalid channel: {channel}"}
+
     dev = await asyncio.to_thread(scope.get_device)
-    if not dev: return {"error": "No Device"}
+    if not dev:
+        return {"error": "No Device"}
 
     meta = await asyncio.to_thread(scope.get_metadata_cached, dev)
-    
+
     await asyncio.to_thread(scope.send_cmd, dev, f":DATA:WAVE:SCREEN:CH{channel}?", clear_buffer=True)
     data = await asyncio.to_thread(scope.read_resp, dev, size=USB_READ_SIZE_LARGE, timeout=2000)
-    
-    if not data or len(data) < 10: 
+
+    if not data or len(data) < 10:
         return {"error": "No wave data"}
 
-    try:
-        raw_samples = list(struct.unpack_from(f'<{(len(data)-4)//2}h', data, offset=4))
-    except Exception as e:
-        logger.error(f"Parsing error: {e}")
+    samples_np = parse_raw_samples(data)
+    if samples_np is None:
+        logger.error("Parsing error: parse_raw_samples returned None")
         return {"error": "Data corruption during parsing"}
 
-    total = len(raw_samples)
+    total = len(samples_np)
     step = max(1, total // max_samples)
-    final_samples = raw_samples[::step]
+    final_samples = samples_np[::step].tolist()
 
     ch_list = meta.get("CHANNEL", [{}, {}])
     ch_info = ch_list[channel - 1] if len(ch_list) >= channel else {}
-    
+
     return {
         "channel": channel,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -234,7 +236,7 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
         "metadata": ch_info,
         "timebase": meta.get("TIMEBASE", {}),
         "lsb_per_div": LSB_PER_DIV,
-        "instruction": "voltage = (raw - offset) / 250 * scale * probe"
+        "instruction": VOLTAGE_FORMULA
     }
 
 
@@ -242,27 +244,28 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
 async def capture_dual_waveform(max_samples: int = 400) -> dict:
     """Erfasst BEIDE Kanäle gleichzeitig."""
     dev = await asyncio.to_thread(scope.get_device)
-    if not dev: return {"error": "No Device"}
+    if not dev:
+        return {"error": "No Device"}
 
     meta = await asyncio.to_thread(scope.get_metadata_cached, dev)
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S")
 
     results = {}
     await asyncio.to_thread(scope._clear_buffer, dev)
-    
+
     for ch in [1, 2]:
         await asyncio.to_thread(scope.send_cmd, dev, f":DATA:WAVE:SCREEN:CH{ch}?", clear_buffer=False)
         data = await asyncio.to_thread(scope.read_resp, dev, size=USB_READ_SIZE_LARGE, timeout=2000)
 
         if data and len(data) > 100:
-            try:
-                raw = list(struct.unpack_from(f'<{(len(data)-4)//2}h', data, offset=4))
-                step = max(1, len(raw) // max_samples)
+            samples_np = parse_raw_samples(data)
+            if samples_np is not None:
+                step = max(1, len(samples_np) // max_samples)
                 results[f"CH{ch}"] = {
-                    "samples": raw[::step],
+                    "samples": samples_np[::step].tolist(),
                     "metadata": meta.get("CHANNEL", [{}, {}])[ch - 1]
                 }
-            except:
+            else:
                 results[f"CH{ch}_error"] = "Parsing failed"
         else:
             results[f"CH{ch}_error"] = "No data"
@@ -272,7 +275,7 @@ async def capture_dual_waveform(max_samples: int = 400) -> dict:
         "channels": results,
         "timebase": meta.get("TIMEBASE", {}),
         "lsb_per_div": LSB_PER_DIV,
-        "instruction": "voltage = (raw - offset) / 250 * scale * probe"
+        "instruction": VOLTAGE_FORMULA
     }
 
 

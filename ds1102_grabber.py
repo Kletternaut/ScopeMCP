@@ -6,6 +6,7 @@ import libusb_package
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+from ds1102_logic import decode_and_convert, parse_scale_to_volts, LSB_PER_DIV
 
 # Oszilloskop Konfiguration
 VID, PID = 0x5345, 0x1234
@@ -34,28 +35,10 @@ def read_resp(dev, size=4096, timeout=1500):
             return None
         return full_data
 
-def decode_waveform(raw_data):
-    if len(raw_data) < 4:
-        return None
-    # Header überspringen (: \x03 \x00 \x00)
-    samples_raw = raw_data[4:]
-    try:
-        # Owon nutzt oft Big Endian (>i2) für 16-Bit
-        samples = np.frombuffer(samples_raw, dtype='>i2')
-        return samples
-    except Exception as e:
-        print(f"❌ Fehler beim Dekodieren: {e}")
-        return None
-
-def parse_vscale(v_scale_str):
-    """Wandelt '2.00V' oder '500mV' in einen Float-Faktor um."""
-    try:
-        val = float(v_scale_str[:-1]) # Entfernt 'V' oder 'mV' am Ende
-        if v_scale_str.endswith('mV'):
-            return val / 1000.0
-        return val
-    except:
-        return 1.0
+# decode_waveform und parse_vscale wurden durch ds1102_logic.py ersetzt:
+#   - parse_raw_samples()     -> Little-Endian '<i2' (vorher fehlerhaft Big-Endian '>i2')
+#   - parse_scale_to_volts()  -> robusteres Parsen von 'mV'/'V'-Strings
+#   - decode_and_convert()    -> kombinierter Wrapper inkl. korrekter Volt-Formel
 
 def on_key(event, dev):
     """Event-Handler für Tastenbefehle im Plot-Fenster."""
@@ -108,55 +91,59 @@ def main():
         send_cmd(dev, ":MODel?")
         resp = read_resp(dev)
         if resp:
-            print(f"✅ Oszilloskop erkannt: {repr(resp[:30])}...")
+                    print(f"✅ Oszilloskop erkannt: {repr(resp[:30])}...")
         else:
             print("⚠️ Keine Antwort auf :MODel? - Handshake fehlgeschlagen.")
 
         print("\n🚀 Starte Live-Monitor. Schließe das Fenster zum Beenden.")
-        
-        # Variable für automatische Skalierung am Start
-        v_scale_str = "1.00V" 
-        
+
+        # Startwerte – werden in der ersten Loop-Iteration durch Gerätedaten ersetzt
+        v_scale_str  = "1.00V"
+        v_scale      = 1.0
+        grid_offset  = 0.0
+        probe_factor = 1.0
+
         while plt.fignum_exists(fig.number):
-            # 2. Header abfragen (für aktuelle Skalierung)
+            # 2. Header abfragen (für aktuelle Skalierung + GridOffset)
             send_cmd(dev, ":DATA:WAVE:SCREEN:HEAD?")
             header_raw = read_resp(dev)
-            
-            v_scale = 1.0
+
             if header_raw:
                 json_start = header_raw.find(b'{')
                 if json_start != -1:
                     try:
-                        meta = json.loads(header_raw[json_start:].decode('ascii', errors='ignore'))
-                        v_scale_str = meta['CHANNEL'][0]['SCALE'] # z.B. "2.00V"
-                        v_scale = parse_vscale(v_scale_str)
-                    except: pass
+                        meta        = json.loads(header_raw[json_start:].decode('ascii', errors='ignore'))
+                        ch_meta     = meta['CHANNEL'][0]
+                        v_scale_str = ch_meta['SCALE']                  # z.B. "2.00V"
+                        v_scale     = parse_scale_to_volts(v_scale_str)
+                        grid_offset = float(ch_meta.get('GRID_OFF', 0))
+                        probe_factor = float(ch_meta.get('PROBE', 1))
+                    except:
+                        pass
 
             # 3. CH1 Wellenform abfragen
             send_cmd(dev, ":DATA:WAVE:SCREEN:CH1?")
             wave_raw = read_resp(dev, size=4096)
-            
+
             if wave_raw:
-                samples = decode_waveform(wave_raw)
-                if samples is not None and len(samples) > 0:
-                    # Umrechnung: 
-                    # 100 Digits pro Division (geschätzt aus Capture)
-                    # Volt = (Raw / 100) * Scale
-                    volt_data = (samples.astype(float) / 100.0) * v_scale 
-                    
-                    # Update Plot
+                # Korrekte Umrechnung via ds1102_logic:
+                #   (GridOffset - raw) / 250.0 * scale_v * probe_factor
+                volt_data = decode_and_convert(wave_raw, grid_offset, v_scale, probe_factor)
+
+                if volt_data is not None and len(volt_data) > 0:
+                    # Plot aktualisieren
                     line.set_data(np.arange(len(volt_data)), volt_data)
                     ax.set_xlim(0, len(volt_data))
-                    
-                    # Dynamische Y-Achse
-                    limit = v_scale * 4 # Zeige +/- 4 Divisionen
+
+                    # Dynamische Y-Achse: +/- 4 Divisionen
+                    limit = v_scale * probe_factor * 4
                     ax.set_ylim(-limit, limit)
                     ax.set_title(f"CH1 Live - Scale: {v_scale_str}")
-                    
+
                     fig.canvas.draw_idle()
-                    plt.pause(0.01) # Wichtig für Matplotlib Refresh
-            
-            time.sleep(0.05) # Höhere Refresh-Rate
+                    plt.pause(0.01)  # Wichtig für Matplotlib Refresh
+
+            time.sleep(0.05)  # Höhere Refresh-Rate
 
     except Exception as e:
         import traceback
