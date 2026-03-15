@@ -6,13 +6,15 @@
 
 **DS1102 Scope MCP Server** is a high-performance Python-based bridge that integrates the **Owon/Abestop DS1102 (Firmware V3.1.0)** oscilloscope into the **Model Context Protocol (MCP)** ecosystem.
 
-## Key Features (V1.1.0)
+## Key Features (V1.2.0)
 
 - **AI-Native Control**: AI agents can execute `Autoset`, toggle `RUN/STOP` states, and adjust vertical/horizontal scales through natural language.
-- **Precision 16-bit Data Capture**: Direct extraction of signed 16-bit Little-Endian waveform data. Fixed "Sinus-Matsch" and vertical inversion issues.
-- **Optimized Dual-Channel Tool**: `capture_dual_waveform` reduces capture time from ~16s to ~9s by batching SCPI commands and optimizing USB buffering (32KB).
+- **Async USB Architecture**: All hardware I/O is offloaded via `asyncio.to_thread()`, keeping the MCP event loop responsive.
+- **Precision 16-bit Parsing**: Optimized `struct.unpack` extraction of signed 16-bit waveform data.
+- **Metadata Caching**: Smart 2.0s TTL cache for oscilloscope settings, reducing redundant USB roundtrips.
+- **Robust Error Handling**: Automatic USB re-initialization on disconnect and structured logging.
+- **Optimized Dual-Channel Tool**: Combined hardware and software optimizations reduce capture time by ~55% (16s → ~7s).
 - **Exact Amplitude Calibration**: Integrated 250.0 LSB/Division scaling factor specifically for SCREEN data mode.
-- **Low-Latency Performance**: Optimized internal delays (100ms for non-relay commands) and increased USB timeouts.
 
 ## Installation & Setup
 
@@ -41,19 +43,22 @@
 - **Data Scaling**: 
   - `voltage = ((GridOffset - RawValue) / 250.0) * Scale * Probe`
   - SCREEN data provides 1520 samples per channel.
-- **Mechanical Delays**: A 1.5s delay is automatically applied after `:SCALe` commands for relay safety.
+- **Async I/O**: USB operations run in dedicated threads to prevent blocking.
 
 ## Available MCP Tools
 
-1. `capture_dual_waveform`: Optimized dual-channel acquisition (saves ~50% time).
-2. `capture_waveform`: Single channel acquisition with downsampling.
-3. `get_live_metadata`: Full JSON metadata (Freq, Vpp, Settings).
-4. `run_autoset`: Automatic setup of all parameters.
-5. `set_vertical_scale` / `set_horizontal_scale`: Scale adjustments.
-6. `set_channel_coupling`: AC/DC/GND switching.
-7. `set_voltage_offset`: Vertical position adjustment (in Volts).
-8. `set_trigger_mode` / `set_trigger_slope` / `set_trigger_source`: Trigger configuration.
-9. `set_run_state`: Toggle between RUN and STOP.
+1. `capture_dual_waveform`: Optimized dual-channel acquisition (saves ~55% time).
+2. `capture_waveform`: Single channel acquisition with ISO timestamp and full metadata.
+3. `get_measurements`: Structured calculation of Freq, Period, Vpp, and RMS.
+4. `get_live_metadata`: Full JSON metadata with smart caching.
+5. `set_trigger_level`: High-precision trigger threshold setting (mV).
+6. `get_connection_status`: Quick health check and IDN identification.
+7. `run_autoset`: Automatic setup of all parameters.
+8. `set_vertical_scale` / `set_horizontal_scale`: Scale adjustments with validation.
+9. `set_channel_coupling`: AC/DC/GND switching.
+10. `set_voltage_offset`: Vertical position adjustment (in Volts).
+11. `set_trigger_mode` / `set_trigger_slope` / `set_trigger_source`: Trigger configuration.
+12. `set_run_state`: Toggle between RUN and STOP.
 
 ## License
 MIT

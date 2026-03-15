@@ -2,15 +2,20 @@
 
 ## [V1.2.0] - 2026-03-15
 
-### Performance
-- Replaced all synchronous USB calls with `asyncio.to_thread()` across
-  all MCP tools — reduces dual capture time from ~10.5s to ~7.2s
-- Combined with previous optimizations (V1.1.0), total improvement
-  vs. original: 16.1s → 7.2s (~55% faster)
+### Hinzugefügt
+- **Messwert-Tool**: `get_measurements` für Freq, Vpp, RMS direkt aus Hardware-Metadaten.
+- **Trigger-Level**: `set_trigger_level` Tool für präzise mV-Steuerung.
+- **Verbindungs-Status**: `get_connection_status` für Health-Checks.
+- **Zeitstempel**: ISO-Zeitstempel in allen Capture-Ergebnissen.
+- **Validierung**: Strenge Parameter-Prüfung für Kanäle, Trigger-Modi und Slopes.
 
-### Notes
-- Remaining ~7s is confirmed hardware floor (DS1102 always transfers
-  3044 bytes regardless of sample count — see FINDINGS_USB_Transfer_Limit.md)
+### Performance & Robustheit
+- **Async I/O**: Vollständige Umstellung auf `asyncio.to_thread()` für alle USB-Hardware-Aufrufe.
+- **Schnelles Parsing**: Umstellung auf `struct.unpack` für Waveform-Daten.
+- **Metadaten-Cache**: 2.0s TTL Cache zur Reduzierung von USB-Latenzen.
+- **USB-Recovery**: Automatischer Re-Initialisierungs-Mechanismus bei Verbindungsverlust.
+- **Logging**: Integration des Python `logging` Moduls für strukturierte Fehlersuche.
+- **Optimiertes Buffer-Clearing**: Reduzierte Puffer-Leerzyklen für schnellere Tool-Antworten.
 
 ## [1.1.0] - Aktuell
 
