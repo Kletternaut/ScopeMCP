@@ -1,5 +1,17 @@
 # Changelog
 
+## [V1.2.0] - 2026-03-15
+
+### Performance
+- Replaced all synchronous USB calls with `asyncio.to_thread()` across
+  all MCP tools — reduces dual capture time from ~10.5s to ~7.2s
+- Combined with previous optimizations (V1.1.0), total improvement
+  vs. original: 16.1s → 7.2s (~55% faster)
+
+### Notes
+- Remaining ~7s is confirmed hardware floor (DS1102 always transfers
+  3044 bytes regardless of sample count — see FINDINGS_USB_Transfer_Limit.md)
+
 ## [1.1.0] - Aktuell
 
 ### Hinzugefügt
