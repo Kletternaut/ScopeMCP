@@ -18,11 +18,15 @@ improvement across code quality, performance, robustness, and feature completene
 The DS1102 always transfers the full screen buffer (~3KB) over USB regardless
 of how many samples are requested. This is a hardware/protocol limitation.
 
+**Verification (2026-03-15):**
+Tests with `:DATA:WAVE:POINTS [100, 500, 1000]` showed that the scope always
+returns exactly 3044 bytes. Software-side downsampling is the only viable path.
+
 **Suggestions:**
 - Investigate whether `:WAV:POIN` or similar SCPI commands can limit data
-  transfer at the hardware level before USB transmission begins.
+  transfer at the hardware level before USB transmission begins. (Update: Tested, not effective on this model).
 - Consider adding an async/non-blocking capture mode so the UI stays
-  responsive during acquisition.
+  responsive during acquisition. (Implemented via `asyncio.to_thread`)
 
 ### 1.2 Metadata Cache TTL is Hardcoded
 The 2-second cache TTL in `get_metadata_cached()` is a magic number buried
