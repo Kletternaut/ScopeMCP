@@ -2,7 +2,9 @@
 
 A Python MCP server that connects the [**Owon/Abestop DS1102 (Firmware V3.1.0)**](resources/images/Abestop_DS1102.jpg) oscilloscope (Firmware V3.1.0) to AI assistants like Claude via the [Model Context Protocol](https://modelcontextprotocol.io/).
 
-![ScopeMCP Logo](resources/images/ScopeMCP_klein.png)
+<p align="center">
+  <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="150">
+</p>
 
 ---
 
