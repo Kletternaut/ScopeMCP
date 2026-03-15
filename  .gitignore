@@ -1,0 +1,23 @@
+# Core Agent metadata
+.CoPilot/
+
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Analysis & PCAP
+analysis/
+*.pcapng
+*.txt
+*.csv
+
+# Logs & Summaries
+session_summary.md
+ds1102_protocol.md
+
+# OS specific
+.DS_Store
+Thumbs.db
