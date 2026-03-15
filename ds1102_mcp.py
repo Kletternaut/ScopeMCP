@@ -2,7 +2,6 @@ import asyncio
 import json
 import time
 import logging
-import struct
 import usb.core
 import usb.util
 import usb.backend.libusb1
@@ -19,6 +18,7 @@ VID, PID = 0x5345, 0x1234
 EP_OUT, EP_IN = 0x01, 0x81
 USB_READ_SIZE_LARGE = 32768
 USB_READ_SIZE_SMALL = 8192
+
 # LSB_PER_DIV wird direkt aus ds1102_logic importiert
 META_CACHE_TTL = 2.0  # Sekunden
 CMD_THROTTLE_S = 0.05
