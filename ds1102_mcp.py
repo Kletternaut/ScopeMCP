@@ -136,13 +136,7 @@ class ScopeController:
                 json_str = header_raw[header_raw.find(b"{"):header_raw.rfind(b"}")+1].decode("ascii", errors="ignore")
                 self._meta_cache = json.loads(json_str)
                 self._meta_cache_time = now
-                # DEBUG: Loggt alle Keys des ersten CHANNEL-Eintrags.
-                # Benoetigt um den korrekten Key-Namen fuer GridOffset zu ermitteln
-                # (vermutet: GRID_OFF, muss gegen echte Firmware verifiziert werden).
-                ch_list = self._meta_cache.get("CHANNEL", [])
-                if ch_list:
-                    logger.info(f"[DEBUG] CHANNEL[0] keys: {list(ch_list[0].keys())}")
-                    logger.info(f"[DEBUG] CHANNEL[0] full: {ch_list[0]}")
+                # DEBUG-Logging entfernt – Key 'OFFSET' durch Live-Test verifiziert.
                 return self._meta_cache
         except Exception as e:
             logger.error(f"Metadata fetch failed: {e}")
@@ -250,6 +244,7 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
 
     ch_list = meta.get("CHANNEL", [{}, {}])
     ch_info = ch_list[channel - 1] if len(ch_list) >= channel else {}
+    offset = ch_info.get("OFFSET", 0)
 
     return {
         "channel": channel,
@@ -257,6 +252,7 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
         "raw_samples": final_samples,
         "original_count": total,
         "downsampled_count": len(final_samples),
+        "offset": offset,
         "metadata": ch_info,
         "timebase": meta.get("TIMEBASE", {}),
         "lsb_per_div": LSB_PER_DIV,
