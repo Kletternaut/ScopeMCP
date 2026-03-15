@@ -63,7 +63,7 @@ def main():
     except Exception as be_err:
         print(f"❌ Fehler beim Laden von Backend/Device: {be_err}")
         return
-    
+
     if dev is None:
         print("❌ Gerät nicht gefunden. Ist das Oszi angeschaltet und per USB verbunden?")
         return
@@ -72,17 +72,17 @@ def main():
         print("DEBUG: Versuche set_configuration...")
         dev.set_configuration()
         print("DEBUG: set_configuration erfolgreich.")
-        
+
         # Plot-Setup für Live-Updates
-        plt.ion() 
+        plt.ion()
         fig, ax = plt.subplots(figsize=(10, 5))
         print("DEBUG: Matplotlib Fenster erstellt.")
-        
-        # KEY-Hitcher für interaktive Befehle
+
+        # Tastatur-Handler für interaktive Befehle
         fig.canvas.mpl_connect('key_press_event', lambda event: on_key(event, dev))
-        
+
         line, = ax.plot([], [])
-        ax.set_ylim(-5, 5) # Erster Schätzwert für Volt-Achse
+        ax.set_ylim(-5, 5)
         ax.grid(True)
         ax.set_xlabel("Zeit (Samples)")
         ax.set_ylabel("Spannung (V)")
@@ -91,7 +91,7 @@ def main():
         send_cmd(dev, ":MODel?")
         resp = read_resp(dev)
         if resp:
-                    print(f"✅ Oszilloskop erkannt: {repr(resp[:30])}...")
+            print(f"✅ Oszilloskop erkannt: {repr(resp[:30])}...")
         else:
             print("⚠️ Keine Antwort auf :MODel? - Handshake fehlgeschlagen.")
 
@@ -112,11 +112,11 @@ def main():
                 json_start = header_raw.find(b'{')
                 if json_start != -1:
                     try:
-                        meta        = json.loads(header_raw[json_start:].decode('ascii', errors='ignore'))
-                        ch_meta     = meta['CHANNEL'][0]
-                        v_scale_str = ch_meta['SCALE']                  # z.B. "2.00V"
-                        v_scale     = parse_scale_to_volts(v_scale_str)
-                        grid_offset = float(ch_meta.get('GRID_OFF', 0))
+                        meta         = json.loads(header_raw[json_start:].decode('ascii', errors='ignore'))
+                        ch_meta      = meta['CHANNEL'][0]
+                        v_scale_str  = ch_meta['SCALE']
+                        v_scale      = parse_scale_to_volts(v_scale_str)
+                        grid_offset  = float(ch_meta.get('GRID_OFF', 0))
                         probe_factor = float(ch_meta.get('PROBE', 1))
                     except:
                         pass
@@ -131,19 +131,14 @@ def main():
                 volt_data = decode_and_convert(wave_raw, grid_offset, v_scale, probe_factor)
 
                 if volt_data is not None and len(volt_data) > 0:
-                    # Plot aktualisieren
                     line.set_data(np.arange(len(volt_data)), volt_data)
                     ax.set_xlim(0, len(volt_data))
-
-                    # Dynamische Y-Achse: +/- 4 Divisionen
-                    limit = v_scale * probe_factor * 4
-                    ax.set_ylim(-limit, limit)
+                    ax.set_ylim(-(v_scale * probe_factor * 4), v_scale * probe_factor * 4)
                     ax.set_title(f"CH1 Live - Scale: {v_scale_str}")
-
                     fig.canvas.draw_idle()
-                    plt.pause(0.01)  # Wichtig für Matplotlib Refresh
+                    plt.pause(0.01)
 
-            time.sleep(0.05)  # Höhere Refresh-Rate
+            time.sleep(0.05)
 
     except Exception as e:
         import traceback
