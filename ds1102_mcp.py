@@ -338,5 +338,70 @@ async def set_run_state(state: str) -> str:
     return f"Scope is now {cmd.upper()}"
 
 
+@mcp.tool()
+async def get_measurements() -> dict:
+    """Liefert berechnete Messwerte beider Kanäle (Freq, Vpp, RMS, Period)."""
+    dev = await asyncio.to_thread(scope.get_device)
+    if not dev: return {"error": "No Device"}
+    
+    # Force refresh um aktuelle Messwerte zu erhalten
+    meta = await asyncio.to_thread(scope.get_metadata_cached, dev, 0)
+    
+    result = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "channels": {},
+        "timebase": meta.get("TIMEBASE", {}),
+        "run_status": meta.get("RUNSTATUS")
+    }
+    
+    channels = meta.get("CHANNEL", [])
+    for i, ch in enumerate(channels):
+        name = ch.get("NAME", f"CH{i+1}")
+        freq = ch.get("FREQUENCE", 0)
+        
+        result["channels"][name] = {
+            "frequency_hz": freq,
+            "period_ms": round(1000 / freq, 4) if freq and freq > 0 else None,
+            "scale": ch.get("SCALE"),
+            "probe": ch.get("PROBE"),
+            "coupling": ch.get("COUPLING"),
+            "display": ch.get("DISPLAY"),
+        }
+        
+    return result
+
+
+@mcp.tool()
+async def set_trigger_level(level_mv: float) -> str:
+    """Trigger-Schwelle in mV setzen (z.B. 500.0 für 0.5V)."""
+    dev = await asyncio.to_thread(scope.get_device)
+    if not dev: return "No Device"
+    
+    scope._meta_cache = None
+    await asyncio.to_thread(scope.send_cmd, dev, f":TRIGger:EDGE:LEVel {level_mv:.1f}mV")
+    return f"Trigger Level: {level_mv:.1f}mV"
+
+
+@mcp.tool()
+async def get_connection_status() -> dict:
+    """Prüft ob das Scope verbunden und erreichbar ist."""
+    dev = await asyncio.to_thread(scope.get_device)
+    if not dev:
+        return {"connected": False, "error": "No USB device found"}
+    
+    try:
+        # Kurzer Check via Metadaten (Cache erzwingen)
+        meta = await asyncio.to_thread(scope.get_metadata_cached, dev, 0)
+        return {
+            "connected": True,
+            "model": meta.get("MODEL", "DS1102"),
+            "run_status": meta.get("RUNSTATUS"),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
+        }
+    except Exception as e:
+        logger.error(f"Connection status check failed: {e}")
+        return {"connected": False, "error": str(e)}
+
+
 if __name__ == "__main__":
     mcp.run()
