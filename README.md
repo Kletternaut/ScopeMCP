@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="waveform_capture.png" alt="DS1102 Waveform Capture" width="800">
+  <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="400">
 </p>
 
 # DS1102 Scope MCP Server (Abestop/Owon V3.1.0)
