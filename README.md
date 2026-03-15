@@ -1,10 +1,10 @@
-# DS1102 Scope MCP Server ([Abestop/Owon SDS1102](resources/images/Abestop_DS1102.jpg) V3.1.0)
+# DS1102 Scope MCP Server (Abestop/Owon SDS1102 V3.1.0)
 
 <p align="center">
   <img src="resources/images/ScopeMCP_klein.png" alt="ScopeMCP Logo" width="200">
 </p>
 
-**DS1102 Scope MCP Server** is a high-performance Python-based bridge that integrates the **Owon/Abestop DS1102 (Firmware V3.1.0)** oscilloscope into the **Model Context Protocol (MCP)** ecosystem.
+**DS1102 Scope MCP Server** is a high-performance Python-based bridge that integrates the [**Owon/Abestop DS1102 (Firmware V3.1.0)**](resources/images/Abestop_DS1102.jpg) oscilloscope into the **Model Context Protocol (MCP)** ecosystem.
 
 ## Key Features (V1.2.0)
 
