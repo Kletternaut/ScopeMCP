@@ -70,6 +70,25 @@ Add to `claude_desktop_config.json`:
 ```
 
 
+## Live Monitor (Grabber)
+
+In addition to the MCP server, this repository includes `ds1102_grabber.py`. This is a lightweight live oscilloscope frontend (GUI) that allows for a real-time view of both channels directly on your PC.
+
+### Features
+- **Dual-Channel Live View**: Simultaneous display of CH1 and CH2.
+- **Real-Time Synchronization**: Automatically adjusts scaling (V/div) and probe factor (1X/10X) when changed on the device.
+- **Clean Grid Mode**: The grid in the grabber perfectly matches the divisions on the hardware oscilloscope (no confusing numerical labels).
+- **Keyboard Shortcuts**: Basic control directly via keyboard (e.g., `SPACE` for RUN/STOP).
+
+### Running the Grabber
+Ensure the oscilloscope is connected via USB and dependencies (`matplotlib`, `numpy`, `pyusb`) are installed.
+
+```bash
+python ds1102_grabber.py
+```
+
+---
+
 ## Known Limitations
 
 - **Capture speed (~7–10s):** The DS1102 always transfers the full 1520-sample buffer over USB. The `:DATA:WAVE:POINTS` SCPI command has no effect on transfer size for this firmware. This is a confirmed hardware limitation — see `FINDINGS_USB_Transfer_Limit.md`.

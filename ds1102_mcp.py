@@ -212,11 +212,16 @@ async def get_measurements() -> dict:
     for i, ch in enumerate(meta.get("CHANNEL", [])):
         name = ch.get("NAME", f"CH{i+1}")
         freq = ch.get("FREQUENCE", 0)
+        
+        # Hinweis: Der probe_factor wird hier auf 1.0 normalisiert, da die 
+        # vom Gerät gelieferten Skalierungswerte den Faktor bereits enthalten.
+        probe_val = 1.0
+
         result["channels"][name] = {
             "frequency_hz": freq,
             "period_ms": round(1000 / freq, 4) if freq and freq > 0 else None,
             "scale": ch.get("SCALE"),
-            "probe": ch.get("PROBE"),
+            "probe": probe_val,
             "coupling": ch.get("COUPLING"),
             "display": ch.get("DISPLAY"),
             "raw_channel_keys": list(ch.keys()),
@@ -257,15 +262,11 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
     ch_info = ch_list[channel - 1] if len(ch_list) >= channel else {}
     offset = ch_info.get("OFFSET", 0)
     
-    # Probe factor sicherstellen (Robustes Parsing für "10X" etc.)
-    probe_raw = str(ch_info.get("PROBE", "1.0")).upper()
-    if probe_raw.endswith("X"):
-        probe_raw = probe_raw[:-1]
-    
-    try:
-        probe = float(probe_raw)
-    except (ValueError, TypeError):
-        probe = 1.0
+    # Hinweis: Der probe_factor wird hier auf 1.0 normalisiert, da die 
+    # Spannungs-Berechnung in der KI-Instruktion erfolgt und wir vermeiden 
+    # wollen, dass der Faktor doppelt angewendet wird, falls die Rohdaten 
+    # bereits skaliert sind.
+    probe = 1.0
 
     return {
         "channel": channel,
@@ -304,15 +305,9 @@ async def capture_dual_waveform(max_samples: int = 400) -> dict:
             if samples_np is not None:
                 ch_info = meta.get("CHANNEL", [{}, {}])[ch - 1]
                 
-                # Probe factor sicherstellen (Robustes Parsing für "10X" etc.)
-                probe_raw = str(ch_info.get("PROBE", "1.0")).upper()
-                if probe_raw.endswith("X"):
-                    probe_raw = probe_raw[:-1]
-                
-                try:
-                    probe = float(probe_raw)
-                except (ValueError, TypeError):
-                    probe = 1.0
+                # Hinweis: Der probe_factor wird hier auf 1.0 normalisiert,
+                # da die Rohwerte bereits skaliert vom Gerät kommen.
+                probe = 1.0
                 
                 # ceil garantiert downsampled_count <= max_samples
                 step = max(1, math.ceil(len(samples_np) / max_samples))
