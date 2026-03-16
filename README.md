@@ -54,6 +54,8 @@ pip install mcp libusb-package pyusb
 
 ## Setup
 
+Detailed installation instructions can be found in [doc/INSTALL.md](doc/INSTALL.md).
+
 Add to `claude_desktop_config.json`:
 
 ```json
