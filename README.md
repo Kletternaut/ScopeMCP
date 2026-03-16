@@ -6,7 +6,7 @@
 
 A Python MCP server that connects the [**Owon/Abestop DS1102 (Firmware V3.1.0)**](resources/images/Abestop_DS1102.jpg) oscilloscope (Firmware V3.1.0) to AI assistants like Claude via the [Model Context Protocol](https://modelcontextprotocol.io/).
 
----
+
 
 ## Available Tools
 
@@ -40,7 +40,6 @@ voltage = (raw - OFFSET) / 250.0 * scale_v * probe_factor
 - `set_run_state(state)`: RUN or STOP.
 - `run_autoset()`: Performs automatic oscilloscope setup.
 
----
 
 ## Requirements
 
@@ -68,8 +67,8 @@ Add to `claude_desktop_config.json`:
   }
 }
 ```
+##
 
----
 
 ## Known Limitations
 
@@ -77,7 +76,6 @@ Add to `claude_desktop_config.json`:
 - **`run_status` never shows `STOP`:** The firmware always reports `TRIG` in the status field, even when stopped. This is a firmware behavior, not a server bug.
 - **CH2 returns zeros when `DISPLAY: OFF`:** No signal data is available from a channel that is disabled on the scope.
 
----
 
 ## Protocol Notes (Firmware V3.1.0)
 
@@ -86,7 +84,7 @@ Add to `claude_desktop_config.json`:
 - Screen data: 1520 samples × 2 bytes signed 16-bit little-endian = 3040 bytes + 4-byte header.
 - Full protocol details: see `ds1102_protocol.md`.
 
----
+
 
 ## License
 
