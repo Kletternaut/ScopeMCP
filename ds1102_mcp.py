@@ -257,9 +257,13 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
     ch_info = ch_list[channel - 1] if len(ch_list) >= channel else {}
     offset = ch_info.get("OFFSET", 0)
     
-    # Probe factor sicherstellen (Default 1.0 falls nicht vorhanden oder ungültig)
+    # Probe factor sicherstellen (Robustes Parsing für "10X" etc.)
+    probe_raw = str(ch_info.get("PROBE", "1.0")).upper()
+    if probe_raw.endswith("X"):
+        probe_raw = probe_raw[:-1]
+    
     try:
-        probe = float(ch_info.get("PROBE", 1.0))
+        probe = float(probe_raw)
     except (ValueError, TypeError):
         probe = 1.0
 
@@ -299,9 +303,14 @@ async def capture_dual_waveform(max_samples: int = 400) -> dict:
             samples_np = parse_raw_samples(data)
             if samples_np is not None:
                 ch_info = meta.get("CHANNEL", [{}, {}])[ch - 1]
-                # Probe factor sicherstellen
+                
+                # Probe factor sicherstellen (Robustes Parsing für "10X" etc.)
+                probe_raw = str(ch_info.get("PROBE", "1.0")).upper()
+                if probe_raw.endswith("X"):
+                    probe_raw = probe_raw[:-1]
+                
                 try:
-                    probe = float(ch_info.get("PROBE", 1.0))
+                    probe = float(probe_raw)
                 except (ValueError, TypeError):
                     probe = 1.0
                 
