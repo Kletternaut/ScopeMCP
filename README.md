@@ -80,7 +80,7 @@ Add to `claude_desktop_config.json`:
 - Every SCPI command is prefixed with a **4-byte little-endian length header**.
 - Commands must end with `\n` (0x0A).
 - Screen data: 1520 samples × 2 bytes signed 16-bit little-endian = 3040 bytes + 4-byte header.
-- Full protocol details: see `ds1102_protocol.md`.
+- Full protocol details: see [doc/ds1102_protocol.md](doc/ds1102_protocol.md).
 
 
 
