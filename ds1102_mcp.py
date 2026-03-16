@@ -245,6 +245,12 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
     ch_list = meta.get("CHANNEL", [{}, {}])
     ch_info = ch_list[channel - 1] if len(ch_list) >= channel else {}
     offset = ch_info.get("OFFSET", 0)
+    
+    # Probe factor sicherstellen (Default 1.0 falls nicht vorhanden oder ungültig)
+    try:
+        probe = float(ch_info.get("PROBE", 1.0))
+    except (ValueError, TypeError):
+        probe = 1.0
 
     return {
         "channel": channel,
@@ -253,6 +259,7 @@ async def capture_waveform(channel: int, max_samples: int = 500) -> dict:
         "original_count": total,
         "downsampled_count": len(final_samples),
         "offset": offset,
+        "probe": probe,
         "metadata": ch_info,
         "timebase": meta.get("TIMEBASE", {}),
         "lsb_per_div": LSB_PER_DIV,
@@ -280,11 +287,20 @@ async def capture_dual_waveform(max_samples: int = 400) -> dict:
         if data and len(data) > 100:
             samples_np = parse_raw_samples(data)
             if samples_np is not None:
+                ch_info = meta.get("CHANNEL", [{}, {}])[ch - 1]
+                # Probe factor sicherstellen
+                try:
+                    probe = float(ch_info.get("PROBE", 1.0))
+                except (ValueError, TypeError):
+                    probe = 1.0
+                
                 # ceil garantiert downsampled_count <= max_samples
                 step = max(1, math.ceil(len(samples_np) / max_samples))
                 results[f"CH{ch}"] = {
                     "samples": samples_np[::step].tolist(),
-                    "metadata": meta.get("CHANNEL", [{}, {}])[ch - 1],
+                    "offset": ch_info.get("OFFSET", 0),
+                    "probe": probe,
+                    "metadata": ch_info,
                 }
             else:
                 results[f"CH{ch}_error"] = "Parsing failed"
