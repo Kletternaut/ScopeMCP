@@ -51,7 +51,6 @@ voltage = (raw - OFFSET) / 250.0 * scale_v * probe_factor
 pip install mcp libusb-package pyusb
 ```
 
----
 
 ## Setup
 
@@ -67,7 +66,6 @@ Add to `claude_desktop_config.json`:
   }
 }
 ```
-##
 
 
 ## Known Limitations
