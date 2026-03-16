@@ -1,5 +1,20 @@
 # Changelog
 
+## [V1.2.1] - 2026-03-16
+
+### Fixed
+- **Amplitude Scaling**: Added explicit `probe` factor to `capture_waveform` and `capture_dual_waveform` results to fix CH2 low-amplitude issues.
+- **Documentation**: Fixed broken protocol link in `README.md`.
+
+### Changed
+- **Legal**: Migrated project license from MIT to **GNU GPLv3**.
+- **Documentation**: Major `README.md` restructure for better clarity, including new tool lists and firmware findings.
+- **Logo**: Centered and resized logo for better presentation.
+- **UX**: Reordered README sections to show available tools immediately after the introduction.
+
+### Added
+- **License**: Added official `LICENSE` file (GNU GPLv3).
+
 ## [V1.2.0] - 2026-03-15
 
 ### Added
