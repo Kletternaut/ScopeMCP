@@ -1,14 +1,7 @@
-/**
- * ScopeMCP
- * Copyright (c) 2026 Kletternaut
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
+titel: ScopeMCP
+license: GPL-3.0-or-later
+Copyright (c) 2026 Kletternaut
+
 # Documentation: Owon/Abestop DS1102 USB Protocol
 
 This documentation is based on reverse engineering of the USB traffic between the DSO-Wave software and the oscilloscope (VID: 0x5345, PID: 0x1234).
