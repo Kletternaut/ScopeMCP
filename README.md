@@ -86,4 +86,4 @@ Add to `claude_desktop_config.json`:
 
 ## License
 
-MIT
+GNU GPLv3
